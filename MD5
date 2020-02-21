@@ -1,4 +1,4 @@
-29612623d44a9ccf1204692bb8e38ab9 *DESCRIPTION
+0cd3f8529b9582b328edc19b69cdf273 *DESCRIPTION
 19cb32842fdbdd49d145d3054d547c75 *NAMESPACE
 1dfbd0514e81b266e710b77175d583fb *R/ETTGlobals.R
 cfd0b1aaedd1e5fe70f7bd92a24f7bfc *R/ETTTests.R
@@ -14,7 +14,7 @@ d15abb13b30267240e97cf623b0f4b5c *inst/datasets/BPI_Challenge_3WayEC_2019.RData
 8b2fbb5c7afb2ce52474383d2124c03d *inst/datasets/sales_transactions.csv
 7dcddf1116d09fee00518042a598a50f *inst/doc/SequentialDetector.R
 f1cbe806286e505dd41aff618e240d55 *inst/doc/SequentialDetector.Rnw
-60297714a2ef23f1ae7596fe54c57ddc *inst/doc/SequentialDetector.pdf
+45179e5b86e6bd49236dc955e3891ea4 *inst/doc/SequentialDetector.pdf
 5db72bf42147b1f6f6b41adce991e106 *man/HSC_PC.Rd
 f8b4b29246bc7a603970d4a1909752bb *man/HSC_PC_Attribute.Rd
 db8eccfc919b0c86b4d94087007da57e *man/HSC_PC_Binning.Rd
@@ -54,10 +54,10 @@ e34e0197b4764002146dfd2ceea519eb *src/ETT/ETT_Mappers.hpp
 3011b56c41f4371897e6f334af225244 *src/ETT/ETT_Utils.hpp
 c6cab945ed4ccd60d50c634e7f184b3f *src/ETT/ETT_Wrapper.cpp
 5852320bce2dde9696b94f266e4d5cb8 *src/ETT/ETT_Wrapper.hpp
-55f745404a536ca175184ae759b93089 *src/ETT/Makefile
+fdb3f2b7f49b949a5197116299845444 *src/ETT/Makefile
 0e2e76965c78576f78aa27331831558a *src/ETT_Exports.cpp
 5fe474734b604a819d3ae9c9ae629551 *src/ETT_R.cpp
-30731a77e0a51d97fcecde1113379a25 *src/Makevars
+411792e88ff76ef271a67f7a0f586014 *src/Makevars
 aa38f89e42743944623d34019996c85f *src/RcppExports.cpp
 0d47fb61cff3f4e4263f70a62d069e31 *vignettes/SeqDetect.bib
 f1cbe806286e505dd41aff618e240d55 *vignettes/SequentialDetector.Rnw

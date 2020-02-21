@@ -2,18 +2,15 @@ PKG_CXXFLAGS = -I./ETT
 PKG_LIBS = -L./ETT -lSETT
 CLEANEXTS = o a 
 
-all: clean-b4 sub $(SHLIB) clean-aftr
+all: $(SHLIB)
+shlib-clean: clean
+$(SHLIB): CETT/libSETT.a
 
-sub:
+CETT/libSETT.a:
 	$(info ** Building ETT library)
-	$(MAKE) --directory=ETT CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" AR="$(AR)" RANLIB="$(RANLIB)" lib_ett
-
-clean-b4: 
-	$(info ** Cleaning before compilation)
-	for file in $(CLEANEXTS); do rm -f *.$$file; done
-	$(MAKE) --directory=ETT clean
+	@(cd ETT && $(MAKE) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" AR="$(AR)" RANLIB="$(RANLIB)" lib_ett)
 	
-clean-aftr: 
-	$(info ** Cleaning after compilation)
+clean: 
+	$(info ** Cleaning)
 	for file in $(CLEANEXTS); do rm -f *.$$file; done
-	$(MAKE) --directory=ETT clean
+	@(cd ETT && $(MAKE) clean)
