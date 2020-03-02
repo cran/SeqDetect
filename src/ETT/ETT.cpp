@@ -10,6 +10,7 @@
 #include "ETT.hpp"
 #include "ETT_Utils.hpp"
 #include "ETT_Mappers.hpp"
+#include "ETT_Wrapper.hpp"
 using namespace std;
 
 ETT::ETT(shared_ptr<vector<DecayDescriptor>> decay_descriptors,bool extend_fst_entry) {
@@ -1099,7 +1100,7 @@ void ETT::transfer_to_submachine(set<string> *cstates,ETT *submachine,unordered_
         for(string tr_id:*trans) {
             ETTTransition *tr=transitions[tr_id];
             if(tr->source!=NULL && tr->target!=NULL &&
-               state_mapping->find(*tr->target)!=state_mapping->end()) {
+                state_mapping->find(*tr->target)!=state_mapping->end()) {
                 sub->input_states.insert(*(*state_mapping)[*tr->target]);
                 tr->input_state=new string(*(*state_mapping)[*tr->target]);
                 delete tr->target;
@@ -1154,7 +1155,7 @@ string *ETT::cloneState(ETTState *state) {
 
 string *ETT::cloneTransition(ETTTransition *trans) {
     if(trans!=NULL) {
-        ETTTransition *clone=dynamic_cast<ETTTransition*>(trans)->clone();
+        ETTTransition *clone=trans->clone();
         transitions[clone->id]=clone;
         return &clone->id;
     }
@@ -1170,7 +1171,7 @@ ETT *ETT::generateSubmachineForPatterns(set<string> *patterns,bool transfer,bool
     return sub;
 }
 
-set<string> *ETT::get_input_symbols(string *state_id) {
+set<string> *ETT::get_input_symbols(string *state_id,ETT_Wrapper *wrapper) {
     set<string> *res=new set<string>();
     FilterTransitions *ft1=new FilterTransitions(new set<string>{*state_id});
     ft1->options={Inbound,Entry};
@@ -1180,6 +1181,11 @@ set<string> *ETT::get_input_symbols(string *state_id) {
         res->insert(tr->symbols.begin(),tr->symbols.end());
     }
     delete trans;
+    if(wrapper!=NULL) {
+        set<string> *res_subs=wrapper->findInputSymbols(this, state_id);
+        res->insert(res_subs->begin(), res_subs->end());
+        delete res_subs;
+    }
     return res;
 }
 
@@ -1294,58 +1300,34 @@ ETT *ETT::merge(ETT *ett1, ETT *ett2,MergeOptions option,bool use_symbols,bool u
     }
     if(option==MergeToNewSubmachine) {
         for(auto t1:ett1->transitions) {
-            ETTTransition *tr_clone=t1.second->clone();
-            if(tr_clone->source!=NULL && smap1.find(*tr_clone->source)!=smap1.end()) {
-                delete tr_clone->source;
-                tr_clone->source=new string(*smap1[*tr_clone->source]);
-            }
-            if(tr_clone->target!=NULL && smap1.find(*tr_clone->target)!=smap1.end()) {
-                delete tr_clone->target;
-                tr_clone->target=new string(*smap1[*tr_clone->target]);
-            }
-            string *new_tr_id=new string(generate_hex(10));
-            tmap1[t1.first]=new_tr_id;
-            res->transitions[*new_tr_id]=tr_clone;
+            string *tmp_source=NULL,*tmp_target=NULL;
+            if(t1.second->source!=NULL && smap1.find(*t1.second->source)!=smap1.end()) tmp_source=smap1[*t1.second->source];
+            if(t1.second->target!=NULL && smap1.find(*t1.second->target)!=smap1.end()) tmp_target=smap1[*t1.second->target];
+            ETTTransition *tr_clone=t1.second->clone(generate_hex(10),tmp_source,tmp_target);
+            tmap1[t1.first]=&tr_clone->id;
+            res->transitions[tr_clone->id]=tr_clone;
         }
     }
     for(auto t2:ett2->transitions) {
         string *tmp_source=NULL,*tmp_target=NULL;
-        bool ts=false,tt=false;
-        if(t2.second->source!=NULL && smap2.find(*t2.second->source)!=smap2.end()) {
-            ts=true;
-            tmp_source=new string(*smap2[*t2.second->source]);
-        }
-        if(t2.second->target!=NULL && smap2.find(*t2.second->target)!=smap2.end()) {
-            tt=true;
-            tmp_target=new string(*smap2[*t2.second->target]);
-        }
+        if(t2.second->source!=NULL && smap2.find(*t2.second->source)!=smap2.end()) tmp_source=smap2[*t2.second->source];
+        if(t2.second->target!=NULL && smap2.find(*t2.second->target)!=smap2.end()) tmp_target=smap2[*t2.second->target];
         string *tr_id=res->checkTransition(tmp_source,tmp_target,NULL,t2.second->input_state,t2.second->output_state);
         if(tr_id==NULL) {
-            ETTTransition *tr_old=ett2->transitions[t2.first];
-            ETTTransition *tr_clone=tr_old->clone();
-            if(ts) delete tr_clone->source;
-            tr_clone->source=tmp_source;
-            if(tt) delete tr_clone->target;
-            tr_clone->target=tmp_target;
-            string *new_tr_id=new string(generate_hex(10));
-            tmap2[t2.first]=new_tr_id;
-            tr_clone->id=*new_tr_id;
-            res->transitions[*new_tr_id]=tr_clone;
+            ETTTransition *tr_clone=t2.second->clone(generate_hex(10),tmp_source,tmp_target);
+            tmap2[t2.first]=&tr_clone->id;
+            res->transitions[tr_clone->id]=tr_clone;
         } else {
-            delete tmp_source;delete tmp_target;
-            if(res->transitions.find(*tr_id)!=res->transitions.end()) {
-                ETTTransition *tr=res->transitions[*tr_id];
-                tr->tokens.insert(t2.second->tokens.begin(),t2.second->tokens.end());
-                tr->symbols.insert(t2.second->symbols.begin(),t2.second->symbols.end());
-                tr->patterns.insert(t2.second->patterns.begin(),t2.second->patterns.end());
-            }
+            ETTTransition *tr=res->transitions[*tr_id];
+            tr->tokens.insert(t2.second->tokens.begin(),t2.second->tokens.end());
+            tr->symbols.insert(t2.second->symbols.begin(),t2.second->symbols.end());
+            tr->patterns.insert(t2.second->patterns.begin(),t2.second->patterns.end());
         }
-        //delete tr_id;
     }
     for(auto v:smap1) delete v.second;
     for(auto v:smap2) delete v.second;
-    for(auto v:tmap1) delete v.second;
-    for(auto v:tmap2) delete v.second;
+//    for(auto v:tmap1) delete v.second;
+//    for(auto v:tmap2) delete v.second;
     
     return res;
 }
@@ -1371,17 +1353,96 @@ ETT *ETT::projection(unsigned threshold,bool only_th_transitions) {
     return NULL;
 }
 
-ETT *ETT::compress(ETT *ett1,ETT *ett2,float min_overlap,bool use_symbols,bool use_patterns) {
-    vector<correlation> *map=ETT::compare_states(ett1,ett2,use_symbols,use_patterns);
-    float perc1=(float)map->size()/(float)ett1->states.size(),perc2=(float)map->size()/(float)ett2->states.size();
-    if(perc1==1.0) {
-        ETT::merge(ett2,ett1,MergeToMachine1);
-        return ett2;
-    } else if(perc2==1.0) {
-        ETT::merge(ett1,ett2,MergeToMachine1);
-        return ett1;
+void ETT::transfer_to_submachine(ETT *sub,ETT *super,ETT_Wrapper *wrapper,bool use_symbols,bool use_patterns) {
+    vector<correlation> *map=ETT::compare_states(sub,super,wrapper,use_symbols,use_patterns);
+    unordered_map<string,string*> smap,tmap;
+    set<string> *cstates=new set<string>();
+    for(auto it:*map) {
+        cstates->insert(it.second);
+        ETTState *s_super=super->states[it.second],*s_sub=sub->states[it.first];
+        if(typeid(*s_super)==typeid(ETTState)) {
+            smap[s_super->id]=new string(s_sub->id);
+            sub->stateMapper->mergeExtStates(it.first,super->stateMapper,it.second,false);
+            s_sub->entry=s_sub->entry || s_super->entry;
+            s_sub->final=s_sub->final || s_super->final;
+            s_sub->tokens.insert(s_super->tokens.begin(),s_super->tokens.end());
+            s_sub->patterns.insert(s_super->patterns.begin(),s_super->patterns.end());
+        } else if(typeid(*s_super)==typeid(ETTSubmachineState)) {
+            ETTSubmachineState *sub_sub=dynamic_cast<ETTSubmachineState*>(s_sub);
+            ETTSubmachineState *sub_super=dynamic_cast<ETTSubmachineState*>(s_super);
+            if(sub_sub->submachine->getId()==sub_super->submachine->getId()) {
+                smap[sub_super->id]=new string(sub_sub->id);
+                sub->stateMapper->mergeExtStates(it.first,super->stateMapper,it.second,false);
+                sub_sub->input_states.insert(sub_super->input_states.begin(),sub_super->input_states.end());
+                sub_sub->output_states.insert(sub_super->output_states.begin(),sub_super->output_states.end());
+            }
+        }
     }
-    if(perc1<min_overlap || perc2<min_overlap) return NULL;
+    delete map;
+    FilterTransitions *fi=new FilterTransitions(new set<string>(*cstates));
+    fi->options={Internal,Entry,Final};
+    set<string> *trs=super->filterTransitions(fi);
+    for(string tr_id:*trs) {
+        ETTTransition *tr=super->transitions[tr_id];
+        string *tmp_source=NULL,*tmp_target=NULL;
+        if(tr->source!=NULL && smap.find(*tr->source)!=smap.end()) tmp_source=smap[*tr->source];
+        if(tr->target!=NULL && smap.find(*tr->target)!=smap.end()) tmp_target=smap[*tr->target];
+        string *ntr_id=sub->checkTransition(tmp_source,tmp_target,NULL,tr->input_state,tr->output_state);
+        if(ntr_id==NULL) {
+            ETTTransition *tr_clone=tr->clone(generate_hex(10),tmp_source,tmp_target);
+            tmap[tr->id]=&tr_clone->id;
+            sub->transitions[tr_clone->id]=tr_clone;
+        } else {
+            tmap[tr->id]=ntr_id;
+            ETTTransition *tr_clone=sub->transitions[*ntr_id];
+            tr_clone->tokens.insert(tr->tokens.begin(),tr->tokens.end());
+            tr_clone->symbols.insert(tr->symbols.begin(),tr->symbols.end());
+            tr_clone->patterns.insert(tr->patterns.begin(),tr->patterns.end());
+        }
+    }
+    delete trs;
+    super->transfer_to_submachine(cstates,sub,&smap,&tmap);
+    delete cstates;
+    for(auto it:smap) delete it.second;
+}
+
+ETT *ETT::compress(ETT *ett1,ETT *ett2,ETT_Wrapper *wrapper,float min_overlap,bool use_symbols,bool use_patterns) {
+    vector<correlation> *map=ETT::compare_states(ett1,ett2,wrapper,use_symbols,use_patterns);
+    float perc1=(float)map->size()/(float)ett1->states.size(),perc2=(float)map->size()/(float)ett2->states.size();
+    bool sub1=false,sub2=false;
+    if(wrapper!=NULL) {
+        set<string> *refm1=wrapper->referencedFrom(ett1);
+        sub1=refm1->size()>0;
+        delete refm1;
+        set<string> *refm2=wrapper->referencedFrom(ett2);
+        sub2=refm2->size()>0;
+        delete refm2;
+    }
+    if(perc1==1.0) {
+        if(!sub1) {
+            ETT::merge(ett2,ett1,MergeToMachine1);
+            delete map;
+            return ett2;
+        } else {
+            ETT::transfer_to_submachine(ett1, ett2, wrapper, use_symbols, use_patterns);
+            delete map;
+            return NULL;
+        }
+    } else if(perc2==1.0) {
+        if(!sub2) {
+            ETT::merge(ett1,ett2,MergeToMachine1);
+            delete map;
+            return ett1;
+        } else {
+            ETT::transfer_to_submachine(ett2, ett1, wrapper, use_symbols, use_patterns);
+            delete map;
+            return NULL;
+        }
+    }
+    if(perc1<min_overlap || perc2<min_overlap) {
+        delete map;
+        return NULL;
+    }
     ETT *res=new ETT(ett1->getStateMapper()->getDecayDescriptors());
     unordered_map<string,string*> smap1,smap2,tmap1,tmap2;
     set<string> *cstates1=new set<string>(),*cstates2=new set<string>();
@@ -1418,6 +1479,7 @@ ETT *ETT::compress(ETT *ett1,ETT *ett2,float min_overlap,bool use_symbols,bool u
             }
         }
     }
+    delete map;
     FilterTransitions *fi1=new FilterTransitions(new set<string>(*cstates1));
     fi1->options={Internal,Entry,Final};
     set<string> *trs1=ett1->filterTransitions(fi1);
@@ -1428,13 +1490,9 @@ ETT *ETT::compress(ETT *ett1,ETT *ett2,float min_overlap,bool use_symbols,bool u
         if(tr->target!=NULL && smap1.find(*tr->target)!=smap1.end()) tmp_target=smap1[*tr->target];
         string *ntr_id=res->checkTransition(tmp_source,tmp_target,NULL,tr->input_state,tr->output_state);
         if(ntr_id==NULL) {
-            ETTTransition *tr_clone=tr->clone();
-            tr_clone->source=tmp_source;
-            tr_clone->target=tmp_target;
-            ntr_id=new string(generate_hex(10));
-            tmap1[tr->id]=ntr_id;
-            tr_clone->id=*ntr_id;
-            res->transitions[*ntr_id]=tr_clone;
+            ETTTransition *tr_clone=tr->clone(generate_hex(10),tmp_source,tmp_target);
+            tmap1[tr->id]=&tr_clone->id;
+            res->transitions[tr_clone->id]=tr_clone;
         } else {
             ETTTransition *tr_clone=res->transitions[*ntr_id];
             tr_clone->tokens.insert(tr->tokens.begin(),tr->tokens.end());
@@ -1453,13 +1511,9 @@ ETT *ETT::compress(ETT *ett1,ETT *ett2,float min_overlap,bool use_symbols,bool u
         if(tr->target!=NULL && smap2.find(*tr->target)!=smap2.end()) tmp_target=smap2[*tr->target];
         string *ntr_id=res->checkTransition(tmp_source,tmp_target,NULL,tr->input_state,tr->output_state);
         if(ntr_id==NULL) {
-            ETTTransition *tr_clone=tr->clone();
-            tr_clone->source=tmp_source;
-            tr_clone->target=tmp_target;
-            ntr_id=new string(generate_hex(10));
-            tmap2[tr->id]=ntr_id;
-            tr_clone->id=*ntr_id;
-            res->transitions[*ntr_id]=tr_clone;
+            ETTTransition *tr_clone=tr->clone(generate_hex(10),tmp_source,tmp_target);
+            tmap2[tr->id]=&tr_clone->id;
+            res->transitions[tr_clone->id]=tr_clone;
         } else {
             ETTTransition *tr_clone=res->transitions[*ntr_id];
             tr_clone->tokens.insert(tr->tokens.begin(),tr->tokens.end());
@@ -1475,19 +1529,19 @@ ETT *ETT::compress(ETT *ett1,ETT *ett2,float min_overlap,bool use_symbols,bool u
     return res;
 }
 
-vector<correlation> *ETT::compare_states(ETT *ett1,ETT *ett2,bool use_symbols,bool use_patterns) {
-    vector<correlation> *map=new vector<correlation>();
+vector<correlation> *ETT::compare_states(ETT *ett1,ETT *ett2,ETT_Wrapper *wrapper,bool use_symbols,bool use_patterns) {
+    vector<correlation> *map=new vector<correlation>(),*map_sub=new vector<correlation>();
     
     for(auto s1:ett1->states) {
         if(typeid(*s1.second)!=typeid(ETTSubmachineState) && find_if(map->begin(),map->end(),[&s1](const correlation& element){return element.first==s1.first;})==map->end()) {
             string *f1=new string(s1.first);
-            set<string> *s1_symbols=ett1->get_input_symbols(f1);
+            set<string> *s1_symbols=ett1->get_input_symbols(f1,wrapper);
             delete f1;
             set<string> *s1_patterns=&s1.second->patterns;
             for(auto s2:ett2->states) {
                 if(typeid(*s2.second)!=typeid(ETTSubmachineState) && find_if(map->begin(),map->end(),[&s2](const correlation& element){return element.second==s2.first;})==map->end()) {
                     string *f2=new string(s2.first);
-                    set<string> *s2_symbols=ett2->get_input_symbols(f2);
+                    set<string> *s2_symbols=ett2->get_input_symbols(f2,wrapper);
                     delete f2;
                     set<string> *s2_patterns=&s2.second->patterns;
                     bool corr=use_symbols || use_patterns;
@@ -1510,17 +1564,19 @@ vector<correlation> *ETT::compare_states(ETT *ett1,ETT *ett2,bool use_symbols,bo
             delete s1_symbols;
         } else {
             ETTSubmachineState *ess1=dynamic_cast<ETTSubmachineState*>(s1.second);
-            if(ess1!=NULL && find_if(map->begin(),map->end(),[&s1](const correlation& element){return element.first==s1.first;})==map->end()) {
+            if(ess1!=NULL && find_if(map_sub->begin(),map_sub->end(),[&s1](const correlation& element){return element.first==s1.first;})==map_sub->end()) {
                 for(auto s2:ett2->states) {
                     ETTSubmachineState *ess2=dynamic_cast<ETTSubmachineState*>(s2.second);
-                    if(ess2!=NULL && find_if(map->begin(),map->end(),[&s2](const correlation& element){return element.second==s2.first;})==map->end()) {
+                    if(ess2!=NULL && find_if(map_sub->begin(),map_sub->end(),[&s2](const correlation& element){return element.second==s2.first;})==map_sub->end()) {
                         if(ess1->submachine->getId()==ess2->submachine->getId())
-                            map->push_back(make_pair(s1.first,s2.first));
+                            map_sub->push_back(make_pair(s1.first,s2.first));
                     }
                 }
             }
         }
     }
+    if(map->size()>0) map->insert(map->end(), map_sub->begin(), map_sub->end());
+    delete map_sub;
     
     return map;
 }
@@ -1647,3 +1703,12 @@ void ETT::addTransition(ETTTransition *trans) {
     };
 }
 
+ETTState *ETT::getState(string id) {
+    if(states.find(id)!=states.end()) return states[id];
+    return NULL;
+}
+
+ETTTransition *ETT::getTransition(string id) {
+    if(transitions.find(id)!=transitions.end()) return transitions[id];
+    return NULL;
+}

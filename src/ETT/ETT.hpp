@@ -58,7 +58,20 @@ struct ETTTransition {
         ntrans->patterns.insert(patterns.begin(),patterns.end());
         ntrans->symbols.insert(symbols.begin(),symbols.end());
         if(output_state!=NULL) ntrans->output_state=new string(*output_state);
+        else ntrans->output_state=NULL;
         if(input_state!=NULL) ntrans->input_state=new string(*input_state);
+        else ntrans->input_state=NULL;
+        return ntrans;
+    }
+    ETTTransition *clone(string id,string *source=NULL,string *target=NULL) {
+        ETTTransition *ntrans=this->clone();
+        ntrans->id=id;
+        if(ntrans->source!=NULL) delete ntrans->source;
+        if(source!=NULL) ntrans->source=new string(*source);
+        else ntrans->source=NULL;
+        if(ntrans->target!=NULL) delete ntrans->target;
+        if(target!=NULL) ntrans->target=new string(*target);
+        else ntrans->target=NULL;
         return ntrans;
     }
 };
@@ -252,7 +265,8 @@ struct ETTMatrix {
             for(unsigned col=0;col<_cs;col++) m[_cs*row+col]=0;
     }
     ~ETTMatrix() {
-        free(m);delete names;
+        delete [] m;
+        delete names;
     }
     unsigned& operator()(unsigned row,unsigned col) {
       if (row>=_rs || col>=_cs)
@@ -271,6 +285,7 @@ struct ETTMatrix {
 typedef pair<string,string> correlation;
 typedef pair<PushResult*,ExtendResult*> ProcessResult;
 
+class ETT_Wrapper;
 class ETT {
 private:
     unordered_map<string,ETTState*> states;
@@ -285,7 +300,7 @@ private:
     void extend_forward(ExtendResult *res,string key,string *token,string symbol,bool reuse_states=true,time_t *tstart=NULL,time_t *tend=NULL,string *pattern=NULL,shared_ptr<vector<StatisticalOptions>> stat_options=nullptr);
     void extend_parallel(ExtendResult *res,string key,string *token,string symbol,bool reuse_states=true,time_t *tstart=NULL,time_t *tend=NULL,string *pattern=NULL,shared_ptr<vector<StatisticalOptions>> stat_options=nullptr);
     void extend_entry(ExtendResult *res,string key,string *token,string symbol,bool reuse_states=true,time_t *tstart=NULL,time_t *tend=NULL,string *pattern=NULL,shared_ptr<vector<StatisticalOptions>> stat_options=nullptr);
-    set<string> *get_input_symbols(string *state_id);
+    set<string> *get_input_symbols(string *state_id,ETT_Wrapper *wrapper=NULL);
     void transfer_to_submachine(set<string> *cstates,ETT *submachine,unordered_map<string,string*> *state_mapping,unordered_map<string,string*> *transition_mapping);
 public:
     mutex m;
@@ -331,12 +346,15 @@ public:
     vector<ETTTransition*> *getTransitions();
     void addState(ETTState *state);
     void addTransition(ETTTransition *trans);
+    ETTState *getState(string id);
+    ETTTransition *getTransition(string id);
     
     static void printPushResult(ostream &ostr,ETT *ett,PushResult *result,bool print_cache=true,bool print_keys=true);
     static void printExtendResult(ostream &ostr,ETT *ett,ExtendResult *result,bool print_cache=true,bool print_keys=true);
     static ETT *merge(ETT *ett1,ETT *ett2,MergeOptions option=MergeToNewSubmachine,bool use_symbols=true,bool use_patterns=true);
-    static ETT *compress(ETT *ett1,ETT *ett2,float min_overlap=0.5,bool use_symbols=true,bool use_patterns=true);
-    static vector<correlation> *compare_states(ETT *ett1,ETT *ett2,bool use_symbols=true,bool use_patterns=true);
+    static ETT *compress(ETT *ett1,ETT *ett2,ETT_Wrapper *wrapper,float min_overlap=0.5,bool use_symbols=true,bool use_patterns=true);
+    static void transfer_to_submachine(ETT *sub,ETT *super,ETT_Wrapper *wrapper,bool use_symbols,bool use_patterns);
+    static vector<correlation> *compare_states(ETT *ett1,ETT *ett2,ETT_Wrapper *wrapper,bool use_symbols=true,bool use_patterns=true);
 };
 
 struct ETTSubmachineState:ETTState {

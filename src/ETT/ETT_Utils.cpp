@@ -1,20 +1,25 @@
 #include <unordered_map>
 #include <sstream>
-#include <random>
 #include <string>
 #include <algorithm>
+#include <Rmath.h>
+#include <R.h>
+#include <random>
 #include "ETT_Utils.hpp"
 using namespace std;
 
 string generate_hex(const unsigned int len) {
   stringstream ss;
+  GetRNGstate();
   for(unsigned i = 0; i < len; i++) {
-    const unsigned int rc = rand() % 255;
+    const unsigned int rc = (unsigned)(unif_rand() * 255);
+    //const unsigned int rc = (unsigned)(rand() % 255);
     stringstream hexstream;
     hexstream << hex << rc;
     auto hex = hexstream.str();
     ss << (hex.length() < 2 ? '0' + hex : hex);
   }
+  PutRNGstate();
   return ss.str();
 }
 

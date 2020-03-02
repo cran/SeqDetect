@@ -65,6 +65,8 @@ public:
     vector<string> *getIdentifiers();
     unique_ptr<ETTMatrix> calculateCoincidence(string machine_id,bool patterns=false);
     void addMachine(ETT *machine);
+    set<string> *findInputSymbols(ETT *machine,string *state_id);
+    set<string> *referencedFrom(ETT *checked_machine);
 };
 
 #endif

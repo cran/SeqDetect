@@ -1251,7 +1251,7 @@ After loading, the deserialization method \emph{deserialize} can be invoked expl
 <<results=hide>>=
 new_seq_detector_oo <- readRDS("test.RDS")
 @
-<<>>=
+<<results=hide,echo=FALSE>>=
 file.remove("test.RDS")
 @
 <<eval=FALSE>>=

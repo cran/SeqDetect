@@ -155,7 +155,7 @@ void ETT_Wrapper::cleanMachineKeys(string *machine_id) {
 }
 
 bool ETT_Wrapper::mergeMachines(string id1,string id2) {
-    vector<correlation> *corr=ETT::compare_states(machines[id1],machines[id2]);
+    vector<correlation> *corr=ETT::compare_states(machines[id1],machines[id2],this);
     int siz=(int)corr->size();
     delete corr;
     if(siz>0) {
@@ -185,23 +185,34 @@ void ETT_Wrapper::mergeAllMachines() {
 
 bool ETT_Wrapper::compressMachines(float threshold){
     string *id1=NULL,*id2=NULL;
-    float ratio=0.0;
+    float ratio_min=0.0,ratio_max=0.0;
     for(auto it1=machines.begin();it1!=machines.end();it1++) {
         for(auto it2=it1;it2!=machines.end();it2++) {
             if((*it2).first!=(*it1).first) {
-                vector<correlation> *map=ETT::compare_states(it1->second,it2->second);
+                vector<correlation> *map=ETT::compare_states(it1->second,it2->second,this);
                 float ratio1=(float)map->size()/(float)it1->second->getStatesCount(),ratio2=(float)map->size()/(float)it2->second->getStatesCount();
-                float tratio=(float)min(ratio1,ratio2);
-                if(tratio>ratio) {
-                    ratio=tratio;
+                float tratio_max=(float)max(ratio1,ratio2), tratio_min=(float)min(ratio1,ratio2);
+                bool doit=false;
+                if(tratio_min>ratio_min) {
+                    ratio_min=tratio_min;
+                    doit=true;
+                }
+                if(tratio_max>ratio_max) {
+                    ratio_max=tratio_max;
+                    doit=true;
+                }
+                if(doit) {
+                    if(id1!=NULL) delete id1;
+                    if(id2!=NULL) delete id2;
                     id1=new string(it1->second->getId());
                     id2=new string(it2->second->getId());
                 }
+                delete map;
             }
         }
     }
-    if(ratio>=threshold && id1!=NULL && id2!=NULL) {
-        ETT *res=ETT::compress(machines[*id1],machines[*id2],threshold);
+    if(ratio_min>=threshold && id1!=NULL && id2!=NULL) {
+        ETT *res=ETT::compress(machines[*id1],machines[*id2],this,threshold);
         if(res!=NULL) {
             if(res->getId()==*id1) {
                 delete machines[*id2];
@@ -211,9 +222,13 @@ bool ETT_Wrapper::compressMachines(float threshold){
                 machines.erase(*id1);
             } else
                 machines[res->getId()]=res;
+            if(id1!=NULL) delete id1;
+            if(id2!=NULL) delete id2;
             return true;
         }
     }
+    if(id1!=NULL) delete id1;
+    if(id2!=NULL) delete id2;
     return false;
 }
 
@@ -327,4 +342,40 @@ unordered_map<std::string,long*> *ETT_Wrapper::getCurrentCtxSequenceIndices() {
     return &ctx_sequence_indices;
 }
 
+set<string> *ETT_Wrapper::findInputSymbols(ETT *checked_machine,string *state_id) {
+    set<string> *res=new set<string>();
+    set<string> *ref_machines=referencedFrom(checked_machine);
+    if(ref_machines->size()==0) {
+        delete ref_machines;
+        return res;
+    }
+    for(string machine_id:*ref_machines) {
+        ETT *machine=machines[machine_id];
+        set<string> *sstates=machine->filterSubmachineStates();
+        FilterTransitions *filter1=new FilterTransitions(sstates);
+        filter1->options={Inbound};
+        set<string> *trans=machine->filterTransitions(filter1);
+        for(string trans_id:*trans) {
+            ETTTransition *trans=machine->getTransition(trans_id);
+            if(trans!=NULL && *trans->input_state==*state_id) res->insert(trans->symbols.begin(),trans->symbols.end());
+        }
+        delete trans;
+    }
+    delete ref_machines;
+    return res;
+}
 
+set<string> *ETT_Wrapper::referencedFrom(ETT *checked_machine) {
+    set<string> *res=new set<string>();
+    for(auto machine:machines) {
+        if(machine.first!=checked_machine->getId()) {
+            set<string> *sstates=machine.second->filterSubmachineStates();
+            for(string ss_id:*sstates) {
+                ETTSubmachineState *ss=dynamic_cast<ETTSubmachineState*>(machine.second->getState(ss_id));
+                if(ss->submachine->getId()==checked_machine->getId()) res->insert(machine.first);
+            }
+            delete sstates;
+        }
+    }
+    return res;
+}

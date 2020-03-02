@@ -1,16 +1,12 @@
 PKG_CXXFLAGS = -I./ETT
-PKG_LIBS = -L./ETT -lSETT
-CLEANEXTS = o a 
+OBJECTS.ETT = ETT/ETT.o ETT/ETT_Decay.o ETT/ETT_Mappers.o ETT/ETT_Utils.o ETT/ETT_Wrapper.o
+OBJECTS.root = ETT_Exports.o ETT_R.o RcppExports.o
+OBJECTS = $(OBJECTS.ETT) $(OBJECTS.root)
+CLEANEXTS = o a tmp
 
 all: $(SHLIB)
-shlib-clean: clean
-$(SHLIB): CETT/libSETT.a
-
-CETT/libSETT.a:
-	$(info ** Building ETT library)
-	@(cd ETT && $(MAKE) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" AR="$(AR)" RANLIB="$(RANLIB)" lib_ett)
 	
 clean: 
 	$(info ** Cleaning)
-	for file in $(CLEANEXTS); do rm -f *.$$file; done
-	@(cd ETT && $(MAKE) clean)
+	@(for file in $(CLEANEXTS); do rm -f *.$$file;done)
+	@(cd ETT && for file in $(CLEANEXTS); do rm -f *.$$file;done)

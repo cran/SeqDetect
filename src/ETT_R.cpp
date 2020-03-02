@@ -87,7 +87,9 @@ public:
   
   StringVector getMachineIdentifiers() {
     StringVector sv(0);
-    for(string s:*getIdentifiers()) sv.push_back(s);
+    vector<string> *res=getIdentifiers();
+    for(string s:*res) sv.push_back(s);
+    delete res;
     return sv;
   }
   
@@ -355,6 +357,7 @@ public:
     }
     ETT_R_Wrapper *res=new ETT_R_Wrapper(ldd_h,(bool)l_options["reuse_states"],(bool)l_options["parallel_execution"],(bool)l_options["time_series_sequence_stats"],
                                          nullptr,(int)l_options["token_index"],(long)l_options["global_seq_index"],&c_sequences);
+    for(auto seqit:c_sequences) delete seqit.second;
     for(String s:l_names) {
       if(s!="options" && s!="ETT_Version") {
         List mach_values=mach[s];
@@ -442,6 +445,7 @@ public:
           etm->setCache(cache_set);
           delete cache_set;
           esm->_push((string)tkname,keys,etm);
+          delete etm;
           delete keys;
         }
         res->addMachine(machine);
